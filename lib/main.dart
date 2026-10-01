@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'screens/login_screen.dart';
+import 'screens/dashboard_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const AnimeApiApp());
 }
 
@@ -28,7 +29,7 @@ class AnimeApiApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
-      home: const LoginScreen(),
+      home: const DashboardScreen(),
     );
   }
 }

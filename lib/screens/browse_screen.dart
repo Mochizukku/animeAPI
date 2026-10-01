@@ -23,8 +23,16 @@ class BrowseScreen extends StatefulWidget {
 class _BrowseScreenState extends State<BrowseScreen> {
   final _searchController = TextEditingController();
   final _apiService = ApiService();
+  late final Future<List<AnimeGenre>> _genresFuture;
+  AnimeGenre? _selectedGenre;
   Future<List<Anime>>? _searchResults;
   Timer? _searchDebounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _genresFuture = _apiService.fetchGenres();
+  }
 
   @override
   void dispose() {
@@ -33,14 +41,31 @@ class _BrowseScreenState extends State<BrowseScreen> {
     super.dispose();
   }
 
+  void _selectGenre(AnimeGenre genre) {
+    setState(() {
+      _selectedGenre = (_selectedGenre?.malId == genre.malId) ? null : genre;
+    });
+    _search();
+  }
+
   void _search([String? value]) {
     final query = (value ?? _searchController.text).trim();
-    if (query.isEmpty) {
+    if (query.isEmpty && _selectedGenre == null) {
       setState(() => _searchResults = null);
       return;
     }
     setState(() {
-      _searchResults = (widget.searchAnime ?? _apiService.searchAnime)(query);
+      if (widget.searchAnime != null) {
+        _searchResults = widget.searchAnime!(query);
+      } else if (_selectedGenre != null) {
+        _searchResults = _apiService.searchAnimeAdvanced(
+          query: query.isEmpty ? null : query,
+          genreId: _selectedGenre!.malId,
+          genreName: _selectedGenre!.name,
+        );
+      } else {
+        _searchResults = _apiService.searchAnime(query);
+      }
     });
   }
 
@@ -58,7 +83,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: TextField(
             controller: _searchController,
             textInputAction: TextInputAction.search,
@@ -76,6 +101,32 @@ class _BrowseScreenState extends State<BrowseScreen> {
             ),
           ),
         ),
+        SizedBox(
+          height: 40,
+          child: FutureBuilder<List<AnimeGenre>>(
+            future: _genresFuture,
+            builder: (context, snapshot) {
+              final genres = snapshot.data ?? [];
+              if (genres.isEmpty) return const SizedBox.shrink();
+              return ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                scrollDirection: Axis.horizontal,
+                itemCount: genres.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final genre = genres[index];
+                  final isSelected = _selectedGenre?.malId == genre.malId;
+                  return FilterChip(
+                    label: Text(genre.name),
+                    selected: isSelected,
+                    onSelected: (_) => _selectGenre(genre),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
         Expanded(child: _buildResults()),
       ],
     );

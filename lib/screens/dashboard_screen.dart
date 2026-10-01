@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import '../models/anime.dart';
 import '../services/api_service.dart';
+import '../services/storage_service.dart';
 import 'anime_collection_screen.dart';
 import 'browse_screen.dart';
 import 'detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final String username;
+  final StorageService? storageService;
 
-  const DashboardScreen({super.key, required this.username});
+  const DashboardScreen({
+    super.key,
+    this.username = 'Anime Fan',
+    this.storageService,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -17,21 +23,83 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _currentTabIndex = 0;
   final ApiService _apiService = ApiService();
+  StorageService get _storageService =>
+      widget.storageService ?? const StorageService();
   final List<Anime> _savedAnime = [];
   final List<Anime> _watchHistory = [];
 
   late Future<List<Anime>> _animeFuture;
+  int _selectedCategoryIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _loadAnime();
+    _loadPersistedData();
+  }
+
+  Future<void> _loadPersistedData() async {
+    final history = await _storageService.loadWatchHistory();
+    final saved = await _storageService.loadSavedAnime();
+    if (!mounted) return;
+    setState(() {
+      _watchHistory.clear();
+      _watchHistory.addAll(history);
+      _savedAnime.clear();
+      _savedAnime.addAll(saved);
+    });
   }
 
   void _loadAnime() {
     setState(() {
-      _animeFuture = _apiService.fetchTopAnime();
+      switch (_selectedCategoryIndex) {
+        case 1:
+          _animeFuture = _apiService.fetchCurrentSeasonAnime();
+          break;
+        case 2:
+          _animeFuture = _apiService.fetchUpcomingAnime();
+          break;
+        case 3:
+          _animeFuture = _apiService.fetchSchedules();
+          break;
+        default:
+          _animeFuture = _apiService.fetchTopAnime();
+          break;
+      }
     });
+  }
+
+  Future<void> _openRandomAnime() async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('Finding a random anime...'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+    final randomAnime = await _apiService.fetchRandomAnime();
+    if (!mounted) return;
+    if (randomAnime != null) {
+      _openDetail(randomAnime);
+    } else {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not fetch random anime. Try again.')),
+      );
+    }
+  }
+
+  Future<void> _clearAllData() async {
+    await _storageService.clearAll();
+    if (!mounted) return;
+    setState(() {
+      _watchHistory.clear();
+      _savedAnime.clear();
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Watch History and My List have been cleared.'),
+      ),
+    );
   }
 
   void _openDetail(Anime anime) {
@@ -61,6 +129,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _savedAnime.add(anime);
       }
     });
+    _storageService.saveSavedAnime(_savedAnime);
   }
 
   void _recordHistory(Anime anime) {
@@ -70,6 +139,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
       _watchHistory.insert(0, anime);
     });
+    _storageService.saveWatchHistory(_watchHistory);
   }
 
   @override
@@ -95,6 +165,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu_rounded),
+            tooltip: 'Menu',
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         title: Text(
           [
             'Anime Dashboard',
@@ -106,14 +183,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
-          if (_currentTabIndex == 4)
+          if (_currentTabIndex == 0)
             IconButton(
-              icon: const Icon(Icons.logout_rounded),
-              tooltip: 'Log Out',
-              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.casino_outlined),
+              tooltip: 'Surprise Me',
+              onPressed: _openRandomAnime,
             ),
         ],
       ),
+      drawer: _buildDrawer(theme, colorScheme),
       body: IndexedStack(index: _currentTabIndex, children: tabs),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentTabIndex,
@@ -205,6 +283,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
 
+          // Category selector chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 4.0,
+            ),
+            child: Row(
+              children: [
+                ChoiceChip(
+                  label: const Text('Top Anime'),
+                  selected: _selectedCategoryIndex == 0,
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() => _selectedCategoryIndex = 0);
+                      _loadAnime();
+                    }
+                  },
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('This Season'),
+                  selected: _selectedCategoryIndex == 1,
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() => _selectedCategoryIndex = 1);
+                      _loadAnime();
+                    }
+                  },
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Upcoming'),
+                  selected: _selectedCategoryIndex == 2,
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() => _selectedCategoryIndex = 2);
+                      _loadAnime();
+                    }
+                  },
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Schedule'),
+                  selected: _selectedCategoryIndex == 3,
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() => _selectedCategoryIndex = 3);
+                      _loadAnime();
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+
           // Anime List Title
           Padding(
             padding: const EdgeInsets.symmetric(
@@ -212,7 +347,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               vertical: 4.0,
             ),
             child: Text(
-              'Top Anime',
+              const [
+                'Top Anime',
+                'This Season',
+                'Upcoming Anime',
+                'Schedule',
+              ][_selectedCategoryIndex],
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -473,13 +613,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 32),
 
-          // Logout Button
+          // Clear Data Button
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.logout_rounded),
-              label: const Text('Log Out'),
+              onPressed: _clearAllData,
+              icon: const Icon(Icons.delete_outline_rounded),
+              label: const Text('Clear History & My List'),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
@@ -489,6 +629,148 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDrawer(ThemeData theme, ColorScheme colorScheme) {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: colorScheme.primary,
+                    child: Text(
+                      widget.username.isNotEmpty
+                          ? widget.username[0].toUpperCase()
+                          : 'U',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.username,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onPrimaryContainer,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'AnimeAPI',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onPrimaryContainer
+                                .withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: Icon(
+                _currentTabIndex == 0
+                    ? Icons.movie_rounded
+                    : Icons.movie_outlined,
+              ),
+              title: const Text('Home'),
+              selected: _currentTabIndex == 0,
+              onTap: () {
+                Navigator.pop(context);
+                setState(() => _currentTabIndex = 0);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                _currentTabIndex == 1
+                    ? Icons.search_rounded
+                    : Icons.search_outlined,
+              ),
+              title: const Text('Browse'),
+              selected: _currentTabIndex == 1,
+              onTap: () {
+                Navigator.pop(context);
+                setState(() => _currentTabIndex = 1);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                _currentTabIndex == 2
+                    ? Icons.bookmark_rounded
+                    : Icons.bookmark_border_rounded,
+              ),
+              title: const Text('My List'),
+              selected: _currentTabIndex == 2,
+              onTap: () {
+                Navigator.pop(context);
+                setState(() => _currentTabIndex = 2);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                _currentTabIndex == 3
+                    ? Icons.history_rounded
+                    : Icons.history_outlined,
+              ),
+              title: const Text('History'),
+              selected: _currentTabIndex == 3,
+              onTap: () {
+                Navigator.pop(context);
+                setState(() => _currentTabIndex = 3);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                _currentTabIndex == 4
+                    ? Icons.person_rounded
+                    : Icons.person_outline_rounded,
+              ),
+              title: const Text('Profile'),
+              selected: _currentTabIndex == 4,
+              onTap: () {
+                Navigator.pop(context);
+                setState(() => _currentTabIndex = 4);
+              },
+            ),
+            const Spacer(),
+            const Divider(height: 1),
+            ListTile(
+              leading:
+                  const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent),
+              title: const Text(
+                'Clear Saved Data',
+                style: TextStyle(
+                  color: Colors.redAccent,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _clearAllData();
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
