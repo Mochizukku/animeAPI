@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/anime.dart';
 import '../services/api_service.dart';
+import 'anime_collection_screen.dart';
+import 'browse_screen.dart';
 import 'detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -15,6 +17,8 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _currentTabIndex = 0;
   final ApiService _apiService = ApiService();
+  final List<Anime> _savedAnime = [];
+  final List<Anime> _watchHistory = [];
 
   late Future<List<Anime>> _animeFuture;
 
@@ -30,6 +34,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  void _openDetail(Anime anime) {
+    _recordHistory(anime);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DetailScreen(
+          anime: anime,
+          isSaved: _isSaved(anime),
+          onToggleSaved: () => _toggleSaved(anime),
+        ),
+      ),
+    );
+  }
+
+  bool _isSaved(Anime anime) =>
+      _savedAnime.any((savedAnime) => savedAnime.malId == anime.malId);
+
+  void _toggleSaved(Anime anime) {
+    setState(() {
+      if (_isSaved(anime)) {
+        _savedAnime.removeWhere(
+          (savedAnime) => savedAnime.malId == anime.malId,
+        );
+      } else {
+        _savedAnime.add(anime);
+      }
+    });
+  }
+
+  void _recordHistory(Anime anime) {
+    setState(() {
+      _watchHistory.removeWhere(
+        (viewedAnime) => viewedAnime.malId == anime.malId,
+      );
+      _watchHistory.insert(0, anime);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -37,17 +79,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final List<Widget> tabs = [
       _buildAnimeTab(theme, colorScheme),
+      BrowseScreen(onAnimeSelected: _openDetail),
+      AnimeCollectionScreen(
+        emptyMessage: 'Your saved anime will appear here.',
+        anime: _savedAnime,
+        onAnimeSelected: _openDetail,
+      ),
+      AnimeCollectionScreen(
+        emptyMessage: 'Anime you open will appear here.',
+        anime: _watchHistory,
+        onAnimeSelected: _openDetail,
+      ),
       _buildProfileTab(theme, colorScheme),
     ];
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          _currentTabIndex == 0 ? 'Anime Dashboard' : 'My Profile',
+          [
+            'Anime Dashboard',
+            'Browse Anime',
+            'My List',
+            'Watch History',
+            'My Profile',
+          ][_currentTabIndex],
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
-          if (_currentTabIndex == 1)
+          if (_currentTabIndex == 4)
             IconButton(
               icon: const Icon(Icons.logout_rounded),
               tooltip: 'Log Out',
@@ -67,7 +126,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
           NavigationDestination(
             icon: Icon(Icons.movie_outlined),
             selectedIcon: Icon(Icons.movie_rounded),
-            label: 'Anime',
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.search_outlined),
+            selectedIcon: Icon(Icons.search_rounded),
+            label: 'Browse',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.bookmark_border_rounded),
+            selectedIcon: Icon(Icons.bookmark_rounded),
+            label: 'My List',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.history_outlined),
+            selectedIcon: Icon(Icons.history_rounded),
+            label: 'History',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline_rounded),
@@ -195,14 +269,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => DetailScreen(anime: anime),
-                            ),
-                          );
-                        },
+                        onTap: () => _openDetail(anime),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -398,7 +465,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const ListTile(
                     leading: Icon(Icons.api_rounded),
                     title: Text('Data Provider'),
-                    subtitle: Text('Jikan REST API v4'),
+                    subtitle: Text('Jikan REST API v4 with AniList fallback'),
                   ),
                 ],
               ),
