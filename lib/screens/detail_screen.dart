@@ -1,10 +1,35 @@
 import 'package:flutter/material.dart';
 import '../models/anime.dart';
 
-class DetailScreen extends StatelessWidget {
+class DetailScreen extends StatefulWidget {
   final Anime anime;
+  final bool isSaved;
+  final VoidCallback onToggleSaved;
 
-  const DetailScreen({super.key, required this.anime});
+  const DetailScreen({
+    super.key,
+    required this.anime,
+    required this.isSaved,
+    required this.onToggleSaved,
+  });
+
+  @override
+  State<DetailScreen> createState() => _DetailScreenState();
+}
+
+class _DetailScreenState extends State<DetailScreen> {
+  late bool _isSaved;
+
+  @override
+  void initState() {
+    super.initState();
+    _isSaved = widget.isSaved;
+  }
+
+  void _toggleSaved() {
+    widget.onToggleSaved();
+    setState(() => _isSaved = !_isSaved);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,22 +39,31 @@ class DetailScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          anime.displayTitle,
+          widget.anime.displayTitle,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              _isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+            ),
+            tooltip: _isSaved ? 'Remove from My List' : 'Add to My List',
+            onPressed: _toggleSaved,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Anime Header Image
-            if (anime.imageUrl.isNotEmpty)
+            if (widget.anime.imageUrl.isNotEmpty)
               SizedBox(
                 height: 300,
                 width: double.infinity,
                 child: Image.network(
-                  anime.imageUrl,
+                  widget.anime.imageUrl,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) => Container(
                     color: colorScheme.surfaceContainerHighest,
@@ -47,16 +81,16 @@ class DetailScreen extends StatelessWidget {
                 children: [
                   // Title
                   Text(
-                    anime.displayTitle,
+                    widget.anime.displayTitle,
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  if (anime.titleEnglish != null &&
-                      anime.titleEnglish != anime.title) ...[
+                  if (widget.anime.titleEnglish != null &&
+                      widget.anime.titleEnglish != widget.anime.title) ...[
                     const SizedBox(height: 4),
                     Text(
-                      anime.title,
+                    widget.anime.title,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
@@ -67,7 +101,7 @@ class DetailScreen extends StatelessWidget {
                   // Quick Stats Row
                   Row(
                     children: [
-                      if (anime.score != null) ...[
+                      if (widget.anime.score != null) ...[
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -90,7 +124,7 @@ class DetailScreen extends StatelessWidget {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                anime.score!.toStringAsFixed(1),
+                                widget.anime.score!.toStringAsFixed(1),
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   color: Colors.amber,
@@ -101,16 +135,16 @@ class DetailScreen extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                       ],
-                      if (anime.type != null) ...[
+                      if (widget.anime.type != null) ...[
                         Chip(
-                          label: Text(anime.type!),
+                          label: Text(widget.anime.type!),
                           visualDensity: VisualDensity.compact,
                         ),
                         const SizedBox(width: 8),
                       ],
-                      if (anime.episodes != null)
+                      if (widget.anime.episodes != null)
                         Chip(
-                          label: Text('${anime.episodes} Ep'),
+                          label: Text('${widget.anime.episodes} Ep'),
                           visualDensity: VisualDensity.compact,
                         ),
                     ],
@@ -118,11 +152,11 @@ class DetailScreen extends StatelessWidget {
                   const SizedBox(height: 12),
 
                   // Genres
-                  if (anime.genres.isNotEmpty) ...[
+                  if (widget.anime.genres.isNotEmpty) ...[
                     Wrap(
                       spacing: 8,
                       runSpacing: 4,
-                      children: anime.genres
+                      children: widget.anime.genres
                           .map((genre) => ActionChip(
                                 label: Text(genre),
                                 onPressed: () {},
@@ -141,7 +175,7 @@ class DetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    anime.synopsis ?? 'No synopsis available.',
+                    widget.anime.synopsis ?? 'No synopsis available.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       height: 1.5,
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.85),

@@ -23,21 +23,26 @@ class Anime {
 
   String get displayTitle =>
       (titleEnglish != null && titleEnglish!.trim().isNotEmpty)
-          ? titleEnglish!
-          : title;
+      ? titleEnglish!
+      : title;
 
   factory Anime.fromJson(Map<String, dynamic> json) {
     final images = json['images'] as Map<String, dynamic>?;
     final jpg = images?['jpg'] as Map<String, dynamic>?;
     final webp = images?['webp'] as Map<String, dynamic>?;
 
-    final imgUrl = jpg?['large_image_url'] as String? ??
+    final imgUrl =
+        jpg?['large_image_url'] as String? ??
         jpg?['image_url'] as String? ??
         webp?['image_url'] as String? ??
         '';
 
-    final genresList = (json['genres'] as List<dynamic>?)
-            ?.map((g) => g is Map<String, dynamic> ? (g['name'] as String? ?? '') : '')
+    final genresList =
+        (json['genres'] as List<dynamic>?)
+            ?.map(
+              (g) =>
+                  g is Map<String, dynamic> ? (g['name'] as String? ?? '') : '',
+            )
             .where((name) => name.isNotEmpty)
             .toList() ??
         const [];
@@ -57,6 +62,29 @@ class Anime {
       synopsis: json['synopsis'] as String?,
       type: json['type'] as String?,
       genres: genresList,
+    );
+  }
+
+  factory Anime.fromAniListJson(Map<String, dynamic> json) {
+    final title = json['title'] as Map<String, dynamic>?;
+    final coverImage = json['coverImage'] as Map<String, dynamic>?;
+    final genres = (json['genres'] as List<dynamic>? ?? [])
+        .whereType<String>()
+        .toList();
+
+    return Anime(
+      malId: json['idMal'] as int? ?? json['id'] as int? ?? 0,
+      title: title?['romaji'] as String? ?? 'Untitled',
+      titleEnglish: title?['english'] as String?,
+      imageUrl:
+          coverImage?['large'] as String? ??
+          coverImage?['medium'] as String? ??
+          '',
+      score: (json['averageScore'] as num?)?.toDouble(),
+      episodes: json['episodes'] as int?,
+      synopsis: json['description'] as String?,
+      type: json['format'] as String?,
+      genres: genres,
     );
   }
 }
